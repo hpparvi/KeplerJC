@@ -42,7 +42,7 @@ class JumpFinder(object):
         self.n_chunks   = nc = self.flux.size // chunk_size
         self.chunks = [s_[i*cs:(i+1)*cs] for i in range(nc)] + [s_[cs*nc:]]
         
-        #excluded_cadences = kwargs.get('excluded_cadences', [])
+        self.exclude = kwargs.get('exclude', [])
     
         
     def minfun(self, pv, sl):
@@ -95,7 +95,10 @@ class JumpFinder(object):
             pr = self.gp.predict(self.flux[sl])
             k = np.argmin(np.abs(cad-jump))
             amplitudes.append(pr[k]-pr[k-1])
-        return [Jump(j,a) for j,a in zip(jumps,amplitudes)]
+
+        jumps = [Jump(j,a) for j,a in zip(jumps,amplitudes)]
+        jumps = [j for j in jumps if not any([e[0] < j.pos < e[1] for e in self.exclude])]
+        return jumps
 
     
     def plot(self, chunk=0, ax=None):
