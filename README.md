@@ -16,8 +16,17 @@ Installation
 Jump detection and correction
 -----------------------------
 
-Take a look at the `Example_1` IPython notebook under the `examples` directory. 
+    from keplerjc import JumpFinder, JumpClassifier
+    
+    jf = JumpFinder(cadence, flux, exclude=[[8883,8938], [10390,10520]])
+    jumps = jf.find_jumps()
 
+    jc = JumpClassifier(cadence, flux, jf.hp)
+    jc.classify(jumps)
+
+![Example_1](examples/ex1.png)
+
+The figure above is reproduced in the `Example_1` IPython notebook under the `examples` directory. Discontinuities identified as jumps are marked with slashed vertical lines, while transit-like features are marked as thick vertical lines spanning the upper part of the figure. 
 
 Authors
 -------
