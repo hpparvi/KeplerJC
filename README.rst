@@ -1,3 +1,6 @@
+.. image:: https://zenodo.org/badge/5871/hpparvi/KeplerJC.svg
+   :target: https://zenodo.org/badge/latestdoi/5871/hpparvi/KeplerJC
+
 Kepler Jump Detection and Classification
 ========================================
 
