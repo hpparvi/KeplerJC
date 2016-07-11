@@ -98,7 +98,7 @@ class JumpFinder(object):
 
         jumps = [Jump(j,a) for j,a in zip(jumps,amplitudes)]
         jumps = [j for j in jumps if not any([e[0] < j.pos < e[1] for e in self.exclude])]
-        return jumps
+        return JumpSet(jumps)
 
     
     def plot(self, chunk=0, ax=None):

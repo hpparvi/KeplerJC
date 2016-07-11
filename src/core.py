@@ -17,6 +17,14 @@ from scipy.ndimage import label
 from numpy import asfortranarray as afa
 from numpy import s_, inf, median, zeros_like, array, argmax, where
 
+try:
+    import pandas as pd
+    with_pandas = True
+except ImportError:
+    with_pandas = False
+
+jump_classes = 'noise slope jump transit flare'.split()
+
 ## Utility functions
 ## =================
 def amax(v):
@@ -34,3 +42,32 @@ class Jump(object):
  
     def __repr__(self):
         return 'Jump({:4.1f}, {:4.1f}, {:})'.format(self.pos, self.amp, self.type)
+
+
+class JumpSet(list):
+    def __init__(self, values=[]):
+        if np.all([isinstance(v, Jump) for v in values]):
+            super(JumpSet, self).__init__(values)
+        else:
+            raise TypeError('JumpSet can contain only Jumps')
+        
+    def append(self, v):
+        if isinstance(v, Jump):
+            super(JumpSet, self).append(v)
+        else:
+            raise TypeError('JumpSet can contain only Jumps')
+
+    @property
+    def types(self):
+        return [j.type for j in self]
+            
+    @property
+    def amplitudes(self):
+        return [j.amp for j in self]
+    
+    @property
+    def bics(self):
+        if with_pandas:
+            return pd.DataFrame([j.bics for j in self], columns=jump_classes)
+        else:
+            return np.array([j.bics for j in self])

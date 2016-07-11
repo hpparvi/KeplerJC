@@ -11,8 +11,6 @@ fm_transit = models.m_transit
 def bic(nln, npv, npt):
     return 2*nln + npv*log(npt)
 
-jc_classes = 'noise slope jump transit flare'.split()
-
 class JumpClassifier(object):
     classes = 'noise slope jump transit flare'.split()
     npar    = [0, 2, 2, 3, 3, 3]

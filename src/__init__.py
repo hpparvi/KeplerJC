@@ -1,5 +1,5 @@
 from jfinder import JumpFinder
 from jclassifier import JumpClassifier
-from core import Jump
+from core import Jump, JumpSet
 
-__all__ = ['JumpFinder', 'JumpClassifier', 'Jump']
+__all__ = ['JumpFinder', 'JumpClassifier', 'Jump', 'JumpSet']
