@@ -1,0 +1,130 @@
+#!/usr/bin/env python
+import numpy as np
+import astropy.io.fits as pf
+import logging
+import warnings
+
+from argparse import ArgumentParser
+from os.path import isdir, dirname, basename, abspath, join
+from keplerjc import JumpFinder, JumpClassifier, Jump
+from glob import glob
+
+import matplotlib.pyplot as pl
+
+try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    mpi_rank = comm.Get_rank()
+    mpi_size = comm.Get_size()
+    with_mpi = True
+except ImportError:
+    mpi_rank = 0
+    mpi_size = 1
+    with_mpi = False
+
+np.seterr(all='ignore')
+logging.basicConfig(level=logging.INFO)
+
+def main():
+    ap = ArgumentParser()
+    ap.add_argument('filename', type=str, help='MAST Kepler file')
+    ap.add_argument('--savedir', type=str, default='.', help='Directory to save the files in')
+    ap.add_argument('--inplace', action='store_true', default=False, help='Modify the original files.')
+    ap.add_argument('--skip-searched', action='store_true', default=False, help='Skip jump-corrected files')
+    ap.add_argument('--logfile', type=str, default=None)
+    ap.add_argument('--plot-interactive', action='store_true', default=False)
+    args = ap.parse_args()
+
+    ## Logging
+    ## -------
+    if mpi_rank == 0:
+        logger = logging.getLogger('Master')
+        if args.logfile:
+            logfile = open(args.logfile, mode='w')
+            fh = logging.StreamHandler(logfile)
+            fh.setFormatter(logging.Formatter('%(levelname)s %(name)s: %(message)s'))
+            fh.setLevel(logging.DEBUG)
+            logger.addHandler(fh)
+
+    if isdir(args.filename):
+        files = sorted(glob(join(args.filename,'kplr*llc.fits')))
+    else:
+        files = [args.filename]
+    nfiles = len(files)
+        
+    logging.info('')
+    logging.info(' KeplerJC')
+    logging.info(' --------')
+    if nfiles == 1:
+        logging.info(' Reducing a single file: %s', abspath(args.filename))
+    else:
+        logging.info(' Reducing %i files in a directory: %s', nfiles, abspath(args.filename))
+    logging.info(' Save directory: %s', abspath(args.savedir) if not args.inplace else abspath(dirname(args.filename)))
+    logging.info(' Mode: %s', 'inplace' if args.inplace else 'new file')
+
+    for filename in files:
+        if nfiles > 1:
+            logging.info('')
+            logging.info(' Reducing file %s', abspath(filename))
+
+        hdul = pf.open(filename, mode = 'update' if args.inplace else 'readonly')
+        data = hdul[1].data
+
+        cadence = data['cadenceno']
+        flux    = data['pdcsap_flux']
+
+        logging.info('')
+        logging.info(' Starting discontinuity search')
+        logging.info(' -----------------------------')
+        jf = JumpFinder(cadence, flux)
+        jumps = jf.find_jumps()
+        logging.info('    Found %i discontinuities', len(jumps))
+
+        logging.info('')
+        logging.info(' Starting discontinuity classification')
+        logging.info(' -------------------------------------')
+        jc = JumpClassifier(cadence, flux, jf.hp)
+        jc.classify(jumps)
+
+        logging.info('')
+        logging.info(' Removing jumps')
+        logging.info(' --------------')
+        tf = jc.flux.copy()
+        for j in jumps:
+            if j.type == 'jump':
+                tf[jc.cadence >= j.pos] -= j.amp
+
+        jcr_flux = np.full_like(flux, np.nan)
+        jcr_flux[np.isfinite(flux)] = tf
+
+        if 'JCR_FLUX' in [c.name for c in data.columns]:
+           data['JCR_FLUX'][:] = jcr_flux
+        else:
+           hdul[1] = pf.TableHDU.from_columns(data.columns + pf.Column(name='JCR_FLUX', format='E', unit='e-/s', disp='E14.7', array=jcr_flux),
+                                               header = hdul[1].header)
+
+        hdul[1].header['jlocs']  = str([j.pos for j in jumps])
+        hdul[1].header['jamps']  = str([j.amp for j in jumps])
+        hdul[1].header['jtypes'] = str([j.type for j in jumps])
+
+        if args.inplace:
+           hdul.flush()
+        else:
+           hdul.writeto(join(args.savedir, basename(filename)), clobber=False)
+        hdul.close()
+
+        logging.info('')
+        logging.info(' Jump correction finished succesfully')
+        logging.info('')
+
+        if args.plot_interactive:
+            fig,ax = pl.subplots(1,1,figsize=(13,5))
+            ax.plot(cadence, flux, 'k')
+            [ax.axvline(j.pos, ls='-', c='k', alpha=0.5) for j in jumps]
+            pl.setp(ax, xlim=cadence[[0,-1]], xlabel='Cadence', ylabel='Flux')
+            fig.tight_layout()
+            pl.show()
+
+
+if __name__ == '__main__':
+    main()
