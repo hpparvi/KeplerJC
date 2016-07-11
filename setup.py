@@ -9,5 +9,7 @@ setup(name='KeplerJC',
       author_email='hpparvi@gmail.com',
       url='https://github.com/hpparvi/KeplerJC',
       package_dir={'keplerjc':'src'},
-      packages=['keplerjc']
+      packages=['keplerjc'],
+      ext_modules=[Extension('keplerjc.fmodels', ['src/models.f90'], libraries=['gomp','m'])]
      )
+    
