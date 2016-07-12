@@ -76,7 +76,7 @@ class JumpClassifier(object):
         ## -----
         nlns = self.nlnlike_noise([], cad, flux)
 
-        pvsl = np.polyfit(cad, flux, 1)
+        pvsl = np.polyfit(cad, flux, 2)
         nlsl = self.nlnlike_slope(pvsl, cad, flux)
 
         ## Jump
@@ -146,7 +146,7 @@ class JumpClassifier(object):
         0 : slope
         1 : intercept
         """
-        return pv[1] + pv[0]*cadence
+        return np.poly1d(pv)(cadence)
 
     
     def m_jump_back(self, pv, cadence):
