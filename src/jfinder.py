@@ -1,6 +1,6 @@
 from __future__ import division
-from core import *
-from mugp import MuGP
+from .core import *
+from .mugp import MuGP
 
 class JumpFinder(object):
     def __init__(self, cadence, flux, kernel='e', chunk_size=128, **kwargs):

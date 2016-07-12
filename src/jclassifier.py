@@ -1,9 +1,9 @@
 from __future__ import division
 from math import copysign, log
-from core import *
-from mugp import MuGP
+from .core import *
+from .mugp import MuGP
 from pyde.de import DiffEvol
-from fmodels import models
+from .fmodels import models
 from scipy.optimize import minimize
 
 fm_transit = models.m_transit

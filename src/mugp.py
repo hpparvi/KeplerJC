@@ -1,4 +1,4 @@
-from core import *
+from .core import *
 
 class MuGP(object):
     """ A minimalistic Gaussian process class.
