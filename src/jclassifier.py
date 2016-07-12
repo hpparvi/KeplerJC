@@ -15,11 +15,11 @@ class JumpClassifier(object):
     classes = 'noise slope jump transit flare'.split()
     npar    = [0, 2, 2, 3, 3, 3]
     
-    def __init__(self, cadence, flux, hp, window_width=75, kernel='e'):
+    def __init__(self, kdata, hp, window_width=75, kernel='e'):
         self.gp = MuGP(kernel=kernel)
-        m = np.isfinite(cadence) & np.isfinite(flux)
-        self.cadence = cadence[m]
-        self.flux = flux[m] / np.median(flux[m]) - 1.
+        self._kdata = kdata
+        self.cadence = self._kdata.cadence
+        self.flux = self._kdata.normalized_flux
         self.hp = hp
         self._ww = window_width
         self._hw = self._ww//2

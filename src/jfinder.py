@@ -3,7 +3,7 @@ from .core import *
 from .mugp import MuGP
 
 class JumpFinder(object):
-    def __init__(self, cadence, flux, kernel='e', chunk_size=128, **kwargs):
+    def __init__(self, kdata, kernel='e', chunk_size=128, **kwargs):
         """Discontinuity detection for photometric time series.
 
         Parameters
@@ -29,15 +29,13 @@ class JumpFinder(object):
         jumps : list of jump objects
         """
         self.gp = MuGP(kernel=kernel)
-        self._cadence_o = np.asarray(cadence)
-        self._flux_o = np.asarray(flux)
+        self._kdata = kdata
         self.hps = None
         self.hp  = None
-
-        self.mask = np.isfinite(self._cadence_o) & np.isfinite(self._flux_o)
-        self.cadence = self._cadence_o[self.mask]
-        self.flux    = self._flux_o[self.mask] / np.nanmedian(self._flux_o) - 1.
-
+        
+        self.cadence = self._kdata.cadence
+        self.flux    = self._kdata.normalized_flux
+        
         self.chunk_size = cs = chunk_size
         self.n_chunks   = nc = self.flux.size // chunk_size
         self.chunks = [s_[i*cs:(i+1)*cs] for i in range(nc)] + [s_[cs*nc:]]

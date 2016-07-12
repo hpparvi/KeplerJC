@@ -6,7 +6,7 @@ import warnings
 
 from argparse import ArgumentParser
 from os.path import isdir, dirname, basename, abspath, join
-from keplerjc import JumpFinder, JumpClassifier, Jump
+from keplerjc import JumpFinder, JumpClassifier, Jump, KData, correct_jumps
 from glob import glob
 
 import matplotlib.pyplot as pl
@@ -69,38 +69,30 @@ def main():
 
         hdul = pf.open(filename, mode = 'update' if args.inplace else 'readonly')
         data = hdul[1].data
-
-        cadence = data['cadenceno']
-        flux    = data['pdcsap_flux']
-
+        kdata   = KData(data['cadenceno'], data['pdcsap_flux'])
+        
         logging.info('')
         logging.info(' Starting discontinuity search')
         logging.info(' -----------------------------')
-        jf = JumpFinder(cadence, flux)
+        jf = JumpFinder(kdata)
         jumps = jf.find_jumps()
         logging.info('    Found %i discontinuities', len(jumps))
 
         logging.info('')
         logging.info(' Starting discontinuity classification')
         logging.info(' -------------------------------------')
-        jc = JumpClassifier(cadence, flux, jf.hp)
+        jc = JumpClassifier(kdata, jf.hp)
         jc.classify(jumps)
 
         logging.info('')
         logging.info(' Removing jumps')
         logging.info(' --------------')
-        tf = jc.flux.copy()
-        for j in jumps:
-            if j.type == 'jump':
-                tf[jc.cadence >= j.pos] -= j.amp
-
-        jcr_flux = np.full_like(flux, np.nan)
-        jcr_flux[np.isfinite(flux)] = tf
+        cdata = correct_jumps(kdata, jumps)
 
         if 'JCR_FLUX' in [c.name for c in data.columns]:
-           data['JCR_FLUX'][:] = jcr_flux
+           data['JCR_FLUX'][:] = cdata._flux
         else:
-           hdul[1] = pf.TableHDU.from_columns(data.columns + pf.Column(name='JCR_FLUX', format='E', unit='e-/s', disp='E14.7', array=jcr_flux),
+           hdul[1] = pf.TableHDU.from_columns(data.columns + pf.Column(name='JCR_FLUX', format='E', unit='e-/s', disp='E14.7', array=cdata._flux),
                                                header = hdul[1].header)
 
         hdul[1].header['jlocs']  = str([j.pos for j in jumps])

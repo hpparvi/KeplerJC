@@ -30,6 +30,35 @@ jump_classes = 'noise slope jump transit flare'.split()
 def amax(v):
     return v[np.argmax(np.abs(v))]
 
+class KData(object):
+    def __init__(self, cadence, flux):
+        self._cadence = cadence.copy()
+        self._flux = flux.copy()
+        self._flux_o = flux.copy()
+        self._mask = np.isfinite(cadence) & np.isfinite(flux)
+        
+    @property
+    def cadence(self):
+        return self._cadence[self._mask]
+
+    @property
+    def flux(self):
+        return self._flux[self._mask]
+
+    @property
+    def normalized_flux(self):
+        return self.flux / self.median - 1.
+
+    @property
+    def median(self):
+        return np.median(self.flux)
+
+    @property
+    def original_flux(self):
+        return self._flux_o[self._mask]
+
+    
+            
 class Jump(object):
     def __init__(self, pos, dy, jtype=None):
         self.pos  = int(pos)
