@@ -23,6 +23,13 @@ try:
 except ImportError:
     with_pandas = False
 
+try:
+    import matplotlib.pyplot as pl
+    with_matplotlib = True
+except ImportError:
+    with_matplotlib = False
+
+    
 jump_classes = 'noise slope jump transit flare'.split()
 
 ## Utility functions
@@ -57,7 +64,23 @@ class KData(object):
     def original_flux(self):
         return self._flux_o[self._mask]
 
-    
+    def plot(self, jumps=None, ax=None):
+        if ax is None:
+            fig,ax = pl.subplots(1,1)
+
+        ax.plot(self._cadence, self._flux, 'k')
+
+        if jumps is not None:
+            [ax.axvline(j.pos, ls=':', c='k', alpha=0.25) for j in jumps if j.type=='noise'] 
+            [ax.axvline(j.pos, ls='--', c='k', alpha=0.5) for j in jumps if j.type=='jump']
+            [ax.axvline(j.pos, 0.9, 1.0, c='k', lw=3)     for j in jumps if j.type=='transit']
+            [ax.axvline(j.pos, ls='-', c='k', alpha=0.5) for j in jumps if j.type=='flare']
+
+        pl.setp(ax, xlim=self._cadence[[0,-1]], xlabel='Cadence', ylabel='Flux')
+
+        if ax is None:
+            fig.tight_layout()
+            
             
 class Jump(object):
     def __init__(self, pos, dy, jtype=None):
