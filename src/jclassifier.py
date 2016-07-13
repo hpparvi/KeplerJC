@@ -59,7 +59,7 @@ class JumpClassifier(object):
             raise NotImplementedError('jumps must be a list of jumps or a single jump.')
         
             
-    def _classify_single(self, jump, de_niter=100, de_npop=30):
+    def _classify_single(self, jump, de_niter=150, de_npop=30):
         idx = np.argmin(np.abs(self.cadence-jump.pos))
         self._sl = sl   = np.s_[max(0, idx-self._hw) : min(idx+self._hw, self.cadence.size)]
         self._cd = cad  = self.cadence[sl].copy()
