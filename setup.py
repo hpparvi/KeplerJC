@@ -9,7 +9,9 @@ setup(name='KeplerJC',
       author_email='hpparvi@gmail.com',
       url='https://github.com/hpparvi/KeplerJC',
       package_dir={'keplerjc':'src'},
+      scripts=['bin/keplerjc'],
       packages=['keplerjc'],
-      ext_modules=[Extension('keplerjc.fmodels', ['src/models.f90'], libraries=['gomp','m'])]
+      ext_modules=[Extension('keplerjc.fmodels', ['src/models.f90'], libraries=['gomp','m'])],
+      install_requires=['numpy', 'scipy', 'astropy']
      )
     
