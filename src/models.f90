@@ -16,7 +16,7 @@ contains
     cstart = floor(center - hdur)
     cend = floor(center + hdur)
 
-    do i = 1,npt
+    do concurrent (i = 1:npt)
        if ((cadence(i) > cstart) .and. (cadence(i) < cend)) then
           model(i) = 1.0d0
        else if (cadence(i) == cstart) then
@@ -29,7 +29,32 @@ contains
     end do
 
     model = -depth*model
-
   end subroutine m_transit
 
+  subroutine m_transits(pv, cadence, npt, npar, npv, model)
+    implicit none
+    integer, intent(in) :: npt, npv, npar
+    real(8), intent(in), dimension(npv,npar) :: pv
+    real(8), intent(in), dimension(npt) :: cadence
+    real(8), intent(out), dimension(npt, npv) :: model
+    integer :: i, j, cstart(npv), cend(npv)
+    real(8) :: hdur(npv)
+
+    hdur = 0.5d0 * pv(:,3)
+    cstart = floor(pv(:,2) - hdur)
+    cend = floor(pv(:,2) + hdur)
+
+    do concurrent (i=1:npt, j=1:npv)
+       if ((cadence(i) > cstart(j)) .and. (cadence(i) < cend(j))) then
+          model(i,j) = 1.0d0
+       else if (cadence(i) == cstart(j)) then
+          model(i,j) = 1.0d0 - (pv(j,2) - hdur(j) - cstart(j))
+       else if (cadence(i) == cend(j)) then
+          model(i,j) = pv(j,2) + hdur(j) - cend(j)
+       else
+          model(i,j) = 0.0d0
+       end if
+       model(i,j) = -pv(j,1)*model(i,j)
+    end do
+  end subroutine m_transits
 end module models
