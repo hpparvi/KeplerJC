@@ -39,8 +39,9 @@ class MuGP(object):
         self.dirty = True
 
 
-    def lnlikelihood(self, x, y, split=None):
-        self.compute(x, split)
+    def lnlikelihood(self, x, y, split=None, freeze_k=False):
+        if not freeze_k:
+            self.compute(x, split)
         self._compute_alpha(y)
         return -(np.log(np.diag(self.L[0])).sum() + 0.5 * np.dot(y,self._alpha))
     
