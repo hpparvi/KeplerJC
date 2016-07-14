@@ -22,6 +22,7 @@ except ImportError:
     mpi_size = 1
     with_mpi = False
 
+mpi_root = 0
 np.seterr(all='ignore')
 logging.basicConfig(level=logging.INFO)
 
@@ -37,7 +38,7 @@ def main():
 
     ## Logging
     ## -------
-    if mpi_rank == 0:
+    if mpi_rank == mpi_root:
         logger = logging.getLogger('Master')
         if args.logfile:
             logfile = open(args.logfile, mode='w')
@@ -46,76 +47,126 @@ def main():
             fh.setLevel(logging.DEBUG)
             logger.addHandler(fh)
 
-    if isdir(args.filename):
-        files = sorted(glob(join(args.filename,'kplr*llc.fits')))
-    else:
-        files = [args.filename]
-    nfiles = len(files)
-        
-    logging.info('')
-    logging.info(' KeplerJC')
-    logging.info(' --------')
-    if nfiles == 1:
-        logging.info(' Reducing a single file: %s', abspath(args.filename))
-    else:
-        logging.info(' Reducing %i files in a directory: %s', nfiles, abspath(args.filename))
-    logging.info(' Save directory: %s', abspath(args.savedir) if not args.inplace else abspath(dirname(args.filename)))
-    logging.info(' Mode: %s', 'inplace' if args.inplace else 'new file')
-
-    for filename in files:
-        if nfiles > 1:
-            logging.info('')
-            logging.info(' Reducing file %s', abspath(filename))
-
-        hdul = pf.open(filename, mode = 'update' if args.inplace else 'readonly')
-        data = hdul[1].data
-        kdata   = KData(data['cadenceno'], data['pdcsap_flux'])
-        
-        logging.info('')
-        logging.info(' Starting discontinuity search')
-        logging.info(' -----------------------------')
-        jf = JumpFinder(kdata)
-        jumps = jf.find_jumps()
-        logging.info('    Found %i discontinuities', len(jumps))
-
-        logging.info('')
-        logging.info(' Starting discontinuity classification')
-        logging.info(' -------------------------------------')
-        jc = JumpClassifier(kdata, jf.hp)
-        jc.classify(jumps)
-
-        logging.info('')
-        logging.info(' Removing jumps')
-        logging.info(' --------------')
-        cdata = correct_jumps(kdata, jumps)
-
-        if 'JCR_FLUX' in [c.name for c in data.columns]:
-           data['JCR_FLUX'][:] = cdata._flux
+        if isdir(args.filename):
+            files = sorted(glob(join(args.filename,'kplr*llc.fits')))
         else:
-           hdul[1] = pf.TableHDU.from_columns(data.columns + pf.Column(name='JCR_FLUX', format='E', unit='e-/s', disp='E14.7', array=cdata._flux),
+            files = [args.filename]
+        nfiles = len(files)
+        
+        logging.info('')
+        logging.info(' KeplerJC')
+        logging.info(' --------')
+        if nfiles == 1:
+            logging.info(' Reducing a single file: %s', abspath(args.filename))
+        else:
+            logging.info(' Reducing %i files in a directory: %s', nfiles, abspath(args.filename))
+        logging.info(' Save directory: %s', abspath(args.savedir) if not args.inplace else abspath(dirname(args.filename)))
+        logging.info(' Mode: %s', 'inplace' if args.inplace else 'new file')
+
+        ## Without MPI or running with a single node
+        ## =========================================
+        if (not with_mpi) or (mpi_size==1) or (nfiles==1):
+            for f in files:
+                reduce(f, args)
+
+        else:
+            ## Master node
+            ## -----------
+            if mpi_rank == 0:
+                free_workers = range(1,mpi_size)
+                active_workers = []
+                n_finished_items = 0
+
+                while files or active_workers:
+                    ## Send a file
+                    while files and free_workers:
+                        w = free_workers.pop()
+                        comm.send(files.pop(), dest=w, tag=0)
+                        active_workers.append(w)
+
+                    ## Receive the results
+                    for w in active_workers:
+                        if comm.Iprobe(w, 2):
+                            res = comm.recv(source=w, tag=2)
+                            free_workers.append(w)
+                            active_workers.remove(w)
+                            n_finished_items += 1
+
+                for w in free_workers:
+                    comm.send(-1, dest=w, tag=0)
+
+    ## Worker node
+    ## -----------
+    else:
+        while True:
+            filename = comm.recv(source=mpi_root, tag=0)
+            if filename == -1:
+                break
+            reduce(filename, args)
+            comm.send(filename, dest=mpi_root, tag=2)    
+
+
+
+def reduce(filename, args):
+    if mpi_rank == mpi_root:
+        logger  = logging.getLogger('Master')
+    else:
+        logger  = logging.getLogger('Worker %i'%mpi_rank)
+
+    linfo  = logger.info
+    lerror = logger.error
+
+    hdul = pf.open(filename, mode = 'update' if args.inplace else 'readonly')
+    data = hdul[1].data
+    kdata   = KData(data['cadenceno'], data['pdcsap_flux'])
+
+    linfo('')
+    linfo(' Reducing file %s', basename(filename))
+    linfo('')
+    linfo(' Starting discontinuity search')
+    linfo(' -----------------------------')
+    jf = JumpFinder(kdata)
+    jumps = jf.find_jumps()
+    linfo('    Found %i discontinuities', len(jumps))
+
+    linfo('')
+    linfo(' Starting discontinuity classification')
+    linfo(' -------------------------------------')
+    jc = JumpClassifier(kdata, jf.hp)
+    jc.classify(jumps)
+
+    linfo('')
+    linfo(' Removing jumps')
+    linfo(' --------------')
+    cdata = correct_jumps(kdata, jumps)
+
+    if 'JCR_FLUX' in [c.name for c in data.columns]:
+        data['JCR_FLUX'][:] = cdata._flux
+    else:
+        hdul[1] = pf.TableHDU.from_columns(data.columns + pf.Column(name='JCR_FLUX', format='E', unit='e-/s', disp='E14.7', array=cdata._flux),
                                                header = hdul[1].header)
 
-        hdul[1].header['jlocs']  = str([j.pos for j in jumps])
-        hdul[1].header['jamps']  = str([j.amp for j in jumps])
-        hdul[1].header['jtypes'] = str([j.type for j in jumps])
+    hdul[1].header['jlocs']  = str([j.pos for j in jumps])
+    hdul[1].header['jamps']  = str([j.amp for j in jumps])
+    hdul[1].header['jtypes'] = str([j.type for j in jumps])
 
-        if args.inplace:
-           hdul.flush()
-        else:
-           hdul.writeto(join(args.savedir, basename(filename)), clobber=False)
-        hdul.close()
+    if args.inplace:
+        hdul.flush()
+    else:
+        hdul.writeto(join(args.savedir, basename(filename)), clobber=False)
+    hdul.close()
 
-        logging.info('')
-        logging.info(' Jump correction finished succesfully')
-        logging.info('')
+    linfo('')
+    linfo(' Jump correction finished succesfully')
+    linfo('')
 
-        if args.plot_interactive:
-            fig,ax = pl.subplots(1,1,figsize=(13,5))
-            ax.plot(cadence, flux, 'k')
-            [ax.axvline(j.pos, ls='-', c='k', alpha=0.5) for j in jumps]
-            pl.setp(ax, xlim=cadence[[0,-1]], xlabel='Cadence', ylabel='Flux')
-            fig.tight_layout()
-            pl.show()
+    if args.plot_interactive:
+        fig,ax = pl.subplots(1,1,figsize=(13,5))
+        ax.plot(cadence, flux, 'k')
+        [ax.axvline(j.pos, ls='-', c='k', alpha=0.5) for j in jumps]
+        pl.setp(ax, xlim=cadence[[0,-1]], xlabel='Cadence', ylabel='Flux')
+        fig.tight_layout()
+        pl.show()
 
 
 if __name__ == '__main__':
