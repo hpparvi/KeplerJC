@@ -3,10 +3,10 @@ module models
   implicit none
 
 contains
-  subroutine m_transit(depth, center, duration, cadence, npt, model)
+  subroutine m_transit(depth, center, duration, baseline, cadence, npt, model)
     implicit none
     integer, intent(in) :: npt
-    real(8), intent(in) :: depth, center, duration
+    real(8), intent(in) :: depth, center, duration, baseline
     real(8), intent(in), dimension(npt) :: cadence
     real(8), intent(out), dimension(npt) :: model
     real(8) :: hdur
@@ -28,7 +28,7 @@ contains
        end if
     end do
 
-    model = -depth*model
+    model = baseline - depth*model
   end subroutine m_transit
 
   subroutine m_transits(pv, cadence, npt, npar, npv, model)
@@ -54,7 +54,43 @@ contains
        else
           model(i,j) = 0.0d0
        end if
-       model(i,j) = -pv(j,1)*model(i,j)
+       model(i,j) = pv(j,4) - pv(j,1)*model(i,j)
     end do
   end subroutine m_transits
+
+  subroutine m_jump(center, width, amplitude, baseline, cadence, npt, model)
+    implicit none
+    integer, intent(in) :: npt
+    real(8), intent(in) :: center, width, amplitude, baseline
+    real(8), intent(in), dimension(npt) :: cadence
+    real(8), intent(out), dimension(npt) :: model
+    real(8) :: hwidth, a,b
+    integer :: i, cstart, cend
+
+    hwidth = 0.5d0*width
+    cstart = floor(center - hwidth)
+    cend = floor(center + hwidth - 1.0d-7)
+
+    do concurrent (i = 1:npt)
+       if (cadence(i) < cstart) then
+          model(i) = -0.5d0
+       else if (cadence(i) > cend) then
+          model(i) =  0.5d0
+       else
+          if (cadence(i) == cstart) then
+             a = -hwidth
+             b = cadence(i) + 1 - center
+          else if (cadence(i) == cend) then
+             a = cadence(i) - center
+             b = hwidth
+          else
+             a = cadence(i) - center
+             b = cadence(i) + 1 - center
+          end if
+          model(i) = (b**2 - a**2) / (2.0d0*width*(b-a))
+       end if
+    end do
+    model = baseline + amplitude*model
+  end subroutine m_jump
+
 end module models

@@ -7,13 +7,14 @@ from .fmodels import models
 from scipy.optimize import minimize
 
 fm_transit = models.m_transit
+fm_jump = models.m_jump
 
 def bic(nln, npv, npt):
     return 2*nln + npv*log(npt)
 
 class JumpClassifier(object):
     classes = 'noise slope jump transit flare'.split()
-    npar    = [0, 2, 2, 3, 3, 3]
+    npar    = [0, 0, 4, 4, 4]
     
     def __init__(self, kdata, hp, window_width=75, kernel='e'):
         self.gp = MuGP(kernel=kernel)
@@ -26,7 +27,7 @@ class JumpClassifier(object):
         self.gp.set_parameters(self.hp)
 
 
-    def classify(self, jumps, de_niter=100, de_npop=30):
+    def classify(self, jumps, de_niter=200, de_npop=30):
         """Classify flux discontinuities
 
         Classifies given flux discontinuities (jumps) as noise, jump, transit, or flare. 
@@ -81,28 +82,11 @@ class JumpClassifier(object):
 
         ## Jump
         ## ----
-        de = DiffEvol(lambda pv: self.nlnlike_jump(pv, cad, flux),
-                      [[    jpos-2,     jpos+2],
-                       [ 0.75*jamp,  1.25*jamp]],
-                      npop=de_npop)
-        de.optimize(de_niter)
-
-        rjump = minimize(self.nlnlike_jump, de.minimum_location, 
-                         (cad, flux), method = 'Nelder-Mead')
-        pvjm, nljm = rjump.x, rjump.fun
+        pvjm, nljm = self.fit_jump(jump, cad, flux, de_npop, de_niter)
 
         ## Transit
         ## -------
-        de = DiffEvol(lambda pv: self.nlnlike_transit(pv, cad, flux),
-                      [[0.8*jamp, 1.2*jamp],
-                       [  jpos-5,   jpos+5],
-                       [     1.2,      50.]],
-                      npop=de_npop)
-        de.optimize(de_niter)
-
-        rtransit = minimize(self.nlnlike_transit, de.minimum_location, 
-                         (cad, flux), method = 'Nelder-Mead')
-        pvtr, nltr = rtransit.x, rtransit.fun
+        pvtr, nltr = self.fit_transit(jump, cad, flux, de_npop, de_niter)
 
         ## Flare
         ## -----
@@ -110,17 +94,47 @@ class JumpClassifier(object):
                          (cad, flux), method = 'Nelder-Mead')
         pvfl, nlfl = rflare.x, rflare.fun
 
-        pvs  = [pvsl, pvjm, pvtr, pvfl]
+        pvs  = [[], pvsl, pvjm, pvtr, pvfl]
         nlns = [nlns, nlsl, nljm, nltr, nlfl]
         bics = [bic(nln, npv, cad.size) for nln,npv in zip(nlns, self.npar)]
         
         cid = np.argmin(bics)
         jump.type = self.classes[cid]
         jump.bics = bics
-        if jump.type in self.classes[2:]:
-            jump._pv = pvs[cid-2]
+        jump._pv = pvs[cid]
 
             
+    def fit_jump(self, jump, cadence, flux, de_npop=30, de_niter=100):
+        jamp, jpos = abs(jump.amp), jump.pos
+        de = DiffEvol(lambda pv: self.nlnlike_jump(pv, cadence, flux),
+                        [[    jpos-2,     jpos+2],
+                        [         1,          3],
+                        [ 0.75*jamp,  1.25*jamp],
+                        [ -0.2*flux.std(), 0.2*flux.std()]],
+                        npop=de_npop)
+        de.optimize(de_niter)
+
+        rjump = minimize(self.nlnlike_jump, de.minimum_location, 
+                         (cadence, flux), method = 'Nelder-Mead')
+        return rjump.x, rjump.fun
+
+    
+    def fit_transit(self, jump, cadence, flux, de_npop=30, de_niter=100):
+        jamp, jpos = abs(jump.amp), jump.pos
+        de = DiffEvol(lambda pv: self.nlnlike_transit(pv, cadence, flux),
+                      [[0.8*jamp, 1.2*jamp],
+                       [  jpos-5,   jpos+5],
+                       [     1.2,      50.],
+                       [ -0.2*flux.std(), 0.2*flux.std()]],
+                      npop=de_npop)
+        de.optimize(de_niter)
+
+        rtransit = minimize(self.nlnlike_transit, de.minimum_location, 
+                         (cadence, flux), method = 'Nelder-Mead')
+        return rtransit.x, rtransit.fun
+
+
+        
     def nlnlike_noise(self, pv, cadence, flux):
         return -self.gp.lnlikelihood(cadence, flux, freeze_k=True)
 
@@ -128,10 +142,12 @@ class JumpClassifier(object):
         return -self.gp.lnlikelihood(cadence, flux-self.m_slope(pv, cadence), freeze_k=True)
     
     def nlnlike_jump(self, pv, cadence, flux):
+        if np.any(pv[:2] < 0) or not (0.5 < pv[1] < 3.0):
+            return inf
         return -self.gp.lnlikelihood(cadence, flux-self.m_jump(pv, cadence), freeze_k=True)
 
     def nlnlike_transit(self, pv, cadence, flux):
-        if np.any(pv <= 0.) or not (self._cd[0] < pv[1] < self._cd[-1]) or not (1. < pv[2] < 50.):
+        if np.any(pv[:-1] <= 0.) or not (self._cd[0] < pv[1] < self._cd[-1]) or not (1. < pv[2] < 50.):
             return inf
         return -self.gp.lnlikelihood(cadence, flux-self.m_transit(pv, cadence), freeze_k=True)
 
@@ -148,22 +164,14 @@ class JumpClassifier(object):
         """
         return np.poly1d(pv)(cadence)
 
-    
-    def m_jump_back(self, pv, cadence):
-        """
-        0 : jump cadence
-        1 : mean level before the jump
-        2 : mean level after the jump
-        """
-        return np.where(cadence < pv[0], pv[1], pv[2])
-
 
     def m_jump(self, pv, cadence):
         """
         0 : jump cadence
-        1 : jump amplitude
+        1 : jump width
+        2 : jump amplitude
         """
-        return np.where(cadence < pv[0], -0.5*pv[1], 0.5*pv[1])
+        return fm_jump(*pv, cadence=cadence)
 
     
     def m_transit(self, pv, cadence):
