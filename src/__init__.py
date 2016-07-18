@@ -4,7 +4,7 @@ from .core import Jump, JumpSet, KData
 
 __all__ = ['correct_jumps', 'KData', 'JumpFinder', 'JumpClassifier', 'Jump', 'JumpSet']
 
-def correct_jumps(data, jumps):
+def correct_jumps(data, jumps, jc):
     """Correct jumps
     
     Parameters
@@ -15,11 +15,11 @@ def correct_jumps(data, jumps):
     jumps : list or JumpSet
             A list of jumps found by JumpFinder and classified
             by JumpClassifier
+
+    jc    : JumpClassifier
     """
     kd = KData(data._cadence, data._flux)
-    nf = data.normalized_flux.copy()
     for j in jumps:
         if j.type == 'jump':
-            nf[data.cadence >= j.pos] -= j.amp
-    kd._flux[kd._mask] = (nf + 1.) * data.median
+            kd._flux[kd._mask] -= j._median * (jc.m_jump(j._pv, data.cadence) + 1.)
     return kd

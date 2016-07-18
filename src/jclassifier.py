@@ -64,10 +64,11 @@ class JumpClassifier(object):
         idx = np.argmin(np.abs(self.cadence-jump.pos))
         self._sl = sl   = np.s_[max(0, idx-self._hw) : min(idx+self._hw, self.cadence.size)]
         self._cd = cad  = self.cadence[sl].copy()
-        self._fl = flux = self.flux[sl].copy()  + 1.
-        flux[:] = flux / median(flux) - 1.
+        self._fl = flux = self._kdata.flux[sl].copy()
+        local_median = median(flux)
+        flux[:] = flux / local_median - 1.
         self.gp.compute(cad)
-
+        
         jamp, jpos = abs(jump.amp), jump.pos
 
         ## Calculate the maximum log likelihoods
@@ -102,7 +103,13 @@ class JumpClassifier(object):
         jump.type = self.classes[cid]
         jump.bics = bics
         jump._pv = pvs[cid]
+        jump._sl = sl
+        jump._median = local_median
 
+        if jump.type == 'jump':
+            jump.pos = pvjm[0]
+            jump.amp = pvjm[2]
+        
             
     def fit_jump(self, jump, cadence, flux, de_npop=30, de_niter=100):
         jamp, jpos = abs(jump.amp), jump.pos
