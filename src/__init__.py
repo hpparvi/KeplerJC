@@ -21,5 +21,5 @@ def correct_jumps(data, jumps, jc):
     kd = KData(data._cadence, data._flux)
     for j in jumps:
         if j.type == 'jump':
-            kd._flux[kd._mask] -= j._median * (jc.m_jump(j._pv, data.cadence) + 1.)
+            kd._flux[kd._mask] -= j._median * (jc.m_jump(j._pv, data.cadence))
     return kd
