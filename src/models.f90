@@ -93,4 +93,31 @@ contains
     model = baseline + amplitude*model
   end subroutine m_jump
 
+  subroutine m_flare(center, width, amplitude, baseline, cadence, npt, model)
+    implicit none
+    integer, intent(in) :: npt
+    real(8), intent(in) :: center, width, amplitude, baseline
+    real(8), intent(in), dimension(npt) :: cadence
+    real(8), intent(out), dimension(npt) :: model
+    real(8) :: a,b
+    integer :: i, cstart, cend
+
+    cstart = floor(center)
+    
+    do concurrent(i = 1:npt)
+       if (cadence(i) >= cstart) then
+          if (cadence(i) > cstart) then
+             a = cadence(i) - center
+             b = cadence(i) + 1.0d0 - center
+          else if (cadence(i) == cstart) then
+             a = 0.0d0
+             b = cadence(i) + 1.0d0 - center
+          end if
+          model(i) = (-exp(-b/width) + exp(-a/width)) * width * (b-a)
+       end if
+    end do
+    model = baseline + amplitude * model
+  end subroutine m_flare
+    
 end module models
+
