@@ -6,7 +6,7 @@ import warnings
 
 from argparse import ArgumentParser
 from os.path import isdir, dirname, basename, abspath, join
-from keplerjc import JumpFinder, JumpClassifier, Jump, KData, correct_jumps
+from keplerjc import JumpFinder, JumpClassifier, KData, correct_jumps
 from glob import glob
 
 import matplotlib.pyplot as pl
@@ -34,6 +34,10 @@ def main():
     ap.add_argument('--skip-searched', action='store_true', default=False, help='Skip jump-corrected files')
     ap.add_argument('--logfile', type=str, default=None)
     ap.add_argument('--plot-interactive', action='store_true', default=False)
+    ap.add_argument('--de-niter', type=int, default=300)
+    ap.add_argument('--de-npop', type=int, default=50)
+    ap.add_argument('--modules', type=str, default=None)
+    ap.add_argument('--outputs', type=str, default=None)
     args = ap.parse_args()
 
     ## Logging
@@ -117,6 +121,19 @@ def reduce(filename, args):
     lerror = logger.error
 
     hdul = pf.open(filename, mode = 'update' if args.inplace else 'readonly')
+
+    if args.modules is not None:
+        modules = np.fromstring(args.modules, sep=',', dtype=np.int)
+        if hdul[0].header['module'] not in modules:
+            linfo(' Skipping a file from an excluded module')
+            return
+        
+    if args.outputs is not None:
+        outputs = np.fromstring(args.outputs, sep=',', dtype=np.int)
+        if hdul[0].header['output'] not in outputs:
+            linfo(' Skipping a file from an excluded output')
+            return
+        
     data = hdul[1].data
     kdata   = KData(data['cadenceno'], data['pdcsap_flux'])
 
@@ -133,12 +150,12 @@ def reduce(filename, args):
     linfo(' Starting discontinuity classification')
     linfo(' -------------------------------------')
     jc = JumpClassifier(kdata, jf.hp)
-    jc.classify(jumps)
+    jc.classify(jumps, de_niter=args.de_niter, de_npop=args.de_npop)
 
     linfo('')
     linfo(' Removing jumps')
     linfo(' --------------')
-    cdata = correct_jumps(kdata, jumps)
+    cdata = correct_jumps(kdata, jumps, jc)
 
     if 'JCR_FLUX' in [c.name for c in data.columns]:
         data['JCR_FLUX'][:] = cdata._flux
