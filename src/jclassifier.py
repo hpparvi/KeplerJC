@@ -113,7 +113,7 @@ class JumpClassifier(object):
             
     def fit_jump(self, jump, cadence, flux, de_npop=30, de_niter=100):
         jamp, jpos = abs(jump.amp), jump.pos
-        de = DiffEvol(lambda pv: self.nlnlike_jump(pv, cadence, flux),
+        de = DiffEvol(lambda pv: self.nlnlike_jump(pv, cadence, flux, jump),
                         [[    jpos-2,     jpos+2],
                         [         1,          3],
                         [ 0.75*jamp,  1.25*jamp],
@@ -122,7 +122,7 @@ class JumpClassifier(object):
         de.optimize(de_niter)
 
         rjump = minimize(self.nlnlike_jump, de.minimum_location, 
-                         (cadence, flux), method = 'Nelder-Mead')
+                         (cadence, flux, jump), method = 'Nelder-Mead')
         return rjump.x, rjump.fun
 
     
@@ -148,8 +148,8 @@ class JumpClassifier(object):
     def nlnlike_slope(self, pv, cadence, flux):
         return -self.gp.lnlikelihood(cadence, flux-self.m_slope(pv, cadence), freeze_k=True)
     
-    def nlnlike_jump(self, pv, cadence, flux):
-        if np.any(pv[:2] < 0) or not (0.5 < pv[1] < 3.0):
+    def nlnlike_jump(self, pv, cadence, flux, jump):
+        if np.any(pv[:2] < 0) or not (0.5 < pv[1] < 3.0) or not (jump.pos-3 <= pv[0] <= jump.pos+3):
             return inf
         return -self.gp.lnlikelihood(cadence, flux-self.m_jump(pv, cadence), freeze_k=True)
 
