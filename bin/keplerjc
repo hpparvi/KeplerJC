@@ -38,6 +38,7 @@ def main():
     ap.add_argument('--de-npop', type=int, default=50)
     ap.add_argument('--modules', type=str, default=None)
     ap.add_argument('--outputs', type=str, default=None)
+    ap.add_argument('--modouts', type=str, default=None)
     args = ap.parse_args()
 
     ## Logging
@@ -121,23 +122,31 @@ def reduce(filename, args):
     lerror = logger.error
 
     hdul = pf.open(filename, mode = 'update' if args.inplace else 'readonly')
-
+    mod = hdul[0].header['module']
+    out = hdul[0].header['output']
+    
+    if args.modouts is not None:
+        modouts = np.array([np.fromstring(s, sep=',', dtype=np.int) for s in args.modouts.split(';')])
+        if not np.any([mod == m and out==o for m,o in modouts]):
+            hdul.close()
+            return
+    
     if args.modules is not None:
         modules = np.fromstring(args.modules, sep=',', dtype=np.int)
-        if hdul[0].header['module'] not in modules:
+        if mod not in modules:
             #linfo(' Skipping a file from an excluded module')
             hdul.close()
             return
         
     if args.outputs is not None:
         outputs = np.fromstring(args.outputs, sep=',', dtype=np.int)
-        if hdul[0].header['output'] not in outputs:
+        if out not in outputs:
             #linfo(' Skipping a file from an excluded output')
             hdul.close()
             return
         
     data = hdul[1].data
-    kdata   = KData(data['cadenceno'], data['pdcsap_flux'])
+    kdata   = KData(data['cadenceno'], data['sap_flux'])
 
     linfo('')
     linfo(' Reducing file %s', basename(filename))
