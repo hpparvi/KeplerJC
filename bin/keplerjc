@@ -125,13 +125,15 @@ def reduce(filename, args):
     if args.modules is not None:
         modules = np.fromstring(args.modules, sep=',', dtype=np.int)
         if hdul[0].header['module'] not in modules:
-            linfo(' Skipping a file from an excluded module')
+            #linfo(' Skipping a file from an excluded module')
+            hdul.close()
             return
         
     if args.outputs is not None:
         outputs = np.fromstring(args.outputs, sep=',', dtype=np.int)
         if hdul[0].header['output'] not in outputs:
-            linfo(' Skipping a file from an excluded output')
+            #linfo(' Skipping a file from an excluded output')
+            hdul.close()
             return
         
     data = hdul[1].data
