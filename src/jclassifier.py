@@ -21,7 +21,7 @@ class JumpClassifier(object):
         self.gp = MuGP(kernel=kernel)
         self._kdata = kdata
         self.cadence = self._kdata.cadence
-        self.flux = self._kdata.normalized_flux
+        self.flux = self._kdata.mf_normalized_flux
         self.hp = hp
         self._ww = window_width
         self._hw = self._ww//2
@@ -65,9 +65,10 @@ class JumpClassifier(object):
         idx = np.argmin(np.abs(self.cadence-jump.pos))
         self._sl = sl   = np.s_[max(0, idx-self._hw) : min(idx+self._hw, self.cadence.size)]
         self._cd = cad  = self.cadence[sl].copy()
-        self._fl = flux = self._kdata.flux[sl].copy()
+        self._fl = flux = self._kdata.mf_flux[sl].copy()
         local_median = median(flux)
         flux[:] = flux / local_median - 1.
+        
         self.gp.compute(cad)
         
         jamp, jpos = abs(jump.amp), jump.pos

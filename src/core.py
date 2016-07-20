@@ -54,9 +54,25 @@ class KData(object):
         return self._flux[self._mask]
 
     @property
+    def mf_flux(self):
+        f1 = self.flux
+        f2 = mf(f1, 3)
+        fr = f1-f2
+        mad = np.median(abs(fr))
+        return np.where(fr > 20*mad, f2, f1)
+    
+    @property
     def normalized_flux(self):
         return self.flux / self.median - 1.
 
+    @property
+    def mf_normalized_flux(self):
+        f1 = self.normalized_flux
+        f2 = mf(f1, 3)
+        fr = f1-f2
+        mad = np.median(abs(fr))
+        return np.where(fr > 20*mad, f2, f1)
+        
     @property
     def median(self):
         return np.median(self.flux)

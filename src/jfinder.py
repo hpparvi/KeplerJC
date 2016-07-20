@@ -34,7 +34,7 @@ class JumpFinder(object):
         self.hp  = None
         
         self.cadence = self._kdata.cadence
-        self.flux    = self._kdata.normalized_flux
+        self.flux    = self._kdata.mf_normalized_flux
         
         self.chunk_size = cs = chunk_size
         self.n_chunks   = nc = self.flux.size // chunk_size
@@ -97,7 +97,7 @@ class JumpFinder(object):
             amplitudes.append(pr[k]-pr[k-1])
 
         jumps = [Jump(j,a) for j,a in zip(jumps,amplitudes)]
-        jumps = [j for j in jumps if not any([e[0] < j.pos < e[1] for e in self.exclude])]
+        jumps = [j for j in jumps if not any([e[0] <= j.pos <= e[1] for e in self.exclude])]
         return JumpSet(jumps)
 
     
