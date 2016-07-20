@@ -13,7 +13,7 @@ class JumpFinder(object):
 
         Keyword arguments
         -----------------
-        excluded_cadences : list of cadence ranges to be excluded
+        exclude : list of cadence ranges to be excluded
 
         n_iterations   : int
         min_gap_width  : int
@@ -41,6 +41,8 @@ class JumpFinder(object):
         self.chunks = [s_[i*cs:(i+1)*cs] for i in range(nc)] + [s_[cs*nc:]]
         
         self.exclude = kwargs.get('exclude', [])
+        self.exclude.append(self.cadence[[0,25]])
+        self.exclude.extend(kdata.calculate_exclusion_ranges(5))
     
         
     def minfun(self, pv, sl):

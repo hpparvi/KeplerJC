@@ -38,9 +38,10 @@ def amax(v):
     return v[np.argmax(np.abs(v))]
 
 class KData(object):
-    def __init__(self, cadence, flux):
+    def __init__(self, cadence, flux, quality):
         self._cadence = cadence.copy()
         self._flux = flux.copy()
+        self._quality = quality.copy()
         self._flux_o = flux.copy()
         self._mask = np.isfinite(cadence) & np.isfinite(flux)
         
@@ -64,6 +65,13 @@ class KData(object):
     def original_flux(self):
         return self._flux_o[self._mask]
 
+    
+    def calculate_exclusion_ranges(self, b):
+        a = array([-b,b])
+        lids, nreg  = label((self._quality & 2**3).astype(np.bool))
+        return [self._cadence[lids == i][[0,-1]] + a for i in range(1,nreg+1)]
+    
+    
     def plot(self, jumps=None, ax=None):
         if ax is None:
             fig,ax = pl.subplots(1,1)
