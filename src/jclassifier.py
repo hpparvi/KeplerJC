@@ -169,7 +169,7 @@ class JumpClassifier(object):
         return -self.gp.lnlikelihood(cadence, flux-self.m_jump(pv, cadence), freeze_k=True)
 
     def nlnlike_transit(self, pv, cadence, flux):
-        if np.any(pv[:-1] <= 0.) or not (self._cd[0] < pv[1] < self._cd[-1]) or not (1. < pv[2] < 50.):
+        if np.any(pv[:-1] <= 0.) or not (self._cd[0]+0.55*pv[2] < pv[1] < self._cd[-1]-0.55*pv[2]) or not (1. < pv[2] < 50.):
             return inf
         return -self.gp.lnlikelihood(cadence, flux-self.m_transit(pv, cadence), freeze_k=True)
 
