@@ -171,7 +171,7 @@ def reduce(filename, args):
     if 'JCR_FLUX' in [c.name for c in data.columns]:
         data['JCR_FLUX'][:] = cdata._flux.astype(np.float32)
     else:
-        hdul[1] = pf.TableHDU.from_columns(data.columns + pf.Column(name='JCR_FLUX', format='E', unit='e-/s', disp='E14.7', array=cdata._flux.astype(np.float32)),
+        hdul[1] = pf.BinTableHDU.from_columns(data.columns + pf.Column(name='JCR_FLUX', format='E', unit='e-/s', disp='E14.7', array=cdata._flux.astype(np.float32)),
                                                header = hdul[1].header)
 
     hdul[1].header['jlocs']  = str([j.pos for j in jumps])
