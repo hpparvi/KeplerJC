@@ -146,7 +146,7 @@ def reduce(filename, args):
             return
         
     data = hdul[1].data
-    kdata   = KData(data['cadenceno'], data['sap_flux'])
+    kdata   = KData(data['cadenceno'], data['sap_flux'], data['sap_quality'])
 
     linfo('')
     linfo(' Reducing file %s', basename(filename))
