@@ -3,15 +3,16 @@ module models
   implicit none
 
 contains
-  subroutine m_transit(depth, center, duration, baseline, cadence, npt, model)
+  subroutine m_transit(depth, center, duration, baseline, slope, cadence, npt, model)
     implicit none
     integer, intent(in) :: npt
-    real(8), intent(in) :: depth, center, duration, baseline
+    real(8), intent(in) :: depth, center, duration, baseline, slope
     real(8), intent(in), dimension(npt) :: cadence
     real(8), intent(out), dimension(npt) :: model
-    real(8) :: hdur
+    real(8) :: hdur, cmean
     integer :: i, cstart, cend
 
+    cmean = sum(cadence)/real(npt,8)
     hdur = 0.5d0*duration
     cstart = floor(center - hdur)
     cend = floor(center + hdur)
@@ -28,7 +29,7 @@ contains
        end if
     end do
 
-    model = baseline - depth*model
+    model = baseline + slope*(cadence-cmean) - depth*model
   end subroutine m_transit
 
   subroutine m_transits(pv, cadence, npt, npar, npv, model)
@@ -58,15 +59,16 @@ contains
     end do
   end subroutine m_transits
 
-  subroutine m_jump(center, width, amplitude, baseline, cadence, npt, model)
+  subroutine m_jump(center, width, amplitude, baseline, slope, cadence, npt, model)
     implicit none
     integer, intent(in) :: npt
-    real(8), intent(in) :: center, width, amplitude, baseline
+    real(8), intent(in) :: center, width, amplitude, baseline, slope
     real(8), intent(in), dimension(npt) :: cadence
     real(8), intent(out), dimension(npt) :: model
-    real(8) :: hwidth, a,b
+    real(8) :: hwidth, cmean, a, b
     integer :: i, cstart, cend
 
+    cmean = sum(cadence) / real(npt, 8)
     hwidth = 0.5d0*width
     cstart = floor(center - hwidth)
     cend = floor(center + hwidth - 1.0d-7)
@@ -90,18 +92,19 @@ contains
           model(i) = (b**2 - a**2) / (2.0d0*width*(b-a))
        end if
     end do
-    model = baseline + amplitude*model
+    model = baseline + slope*(cadence-cmean) + amplitude*model
   end subroutine m_jump
 
-  subroutine m_flare(center, width, amplitude, baseline, cadence, npt, model)
+  subroutine m_flare(center, width, amplitude, baseline, slope, cadence, npt, model)
     implicit none
     integer, intent(in) :: npt
-    real(8), intent(in) :: center, width, amplitude, baseline
+    real(8), intent(in) :: center, width, amplitude, baseline, slope
     real(8), intent(in), dimension(npt) :: cadence
     real(8), intent(out), dimension(npt) :: model
-    real(8) :: a,b
-    integer :: i, cstart, cend
+    real(8) :: cmean, a, b
+    integer :: i, cstart
 
+    cmean  = sum(cadence) / real(npt, 8)
     cstart = floor(center)
     
     do concurrent(i = 1:npt)
@@ -116,7 +119,7 @@ contains
           model(i) = (-exp(-b/width) + exp(-a/width)) * width * (b-a)
        end if
     end do
-    model = baseline + amplitude * model
+    model = baseline + slope*(cadence-cmean) + amplitude * model
   end subroutine m_flare
     
 end module models
