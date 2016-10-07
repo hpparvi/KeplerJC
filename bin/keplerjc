@@ -26,6 +26,9 @@ mpi_root = 0
 np.seterr(all='ignore')
 logging.basicConfig(level=logging.INFO)
 
+excluded_cadences = dict(3 = [[10390,10650]],
+                         4 = [[12900,13000], [13400,13500], [14200,14400]])
+
 def main():
     ap = ArgumentParser()
     ap.add_argument('filename', type=str, help='MAST Kepler file')
@@ -124,6 +127,7 @@ def reduce(filename, args):
     hdul = pf.open(filename, mode = 'update' if args.inplace else 'readonly')
     mod = hdul[0].header['module']
     out = hdul[0].header['output']
+    qrt = hdul[0].header['quarter']
     
     if args.modouts is not None:
         modouts = np.array([np.fromstring(s, sep=',', dtype=np.int) for s in args.modouts.split(';')])
@@ -145,15 +149,16 @@ def reduce(filename, args):
             hdul.close()
             return
         
-    data = hdul[1].data
-    kdata   = KData(data['cadenceno'], data['sap_flux'], data['sap_quality'])
-
+    data     = hdul[1].data
+    kdata    = KData(data['cadenceno'], data['sap_flux'], data['sap_quality'])
+    excluded = excluded_cadences.get(qrt, [])
+    
     linfo('')
     linfo(' Reducing file %s', basename(filename))
     linfo('')
     linfo(' Starting discontinuity search')
     linfo(' -----------------------------')
-    jf = JumpFinder(kdata)
+    jf = JumpFinder(kdata, exclude=excluded)
     jumps = jf.find_jumps()
     linfo('    Found %i discontinuities', len(jumps))
 
