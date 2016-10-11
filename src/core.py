@@ -29,8 +29,6 @@ try:
 except ImportError:
     with_matplotlib = False
 
-    
-jump_classes = 'noise slope jump transit flare'.split()
 
 ## Utility functions
 ## =================
@@ -106,44 +104,3 @@ class KData(object):
             fig.tight_layout()
             
             
-class Jump(object):
-    def __init__(self, pos, dy, jtype=None):
-        self.pos  = int(pos)
-        self.amp   = dy
-        self.type = jtype
-        self._pv  = None
-        
-    def __str__(self):
-        return 'Jump {:4.1f}  {:4.1f} {:}'.format(self.pos, self.amp, self.type or -1)
- 
-    def __repr__(self):
-        return 'Jump({:4.1f}, {:4.1f}, {:})'.format(self.pos, self.amp, self.type)
-
-
-class JumpSet(list):
-    def __init__(self, values=[]):
-        if np.all([isinstance(v, Jump) for v in values]):
-            super(JumpSet, self).__init__(values)
-        else:
-            raise TypeError('JumpSet can contain only Jumps')
-        
-    def append(self, v):
-        if isinstance(v, Jump):
-            super(JumpSet, self).append(v)
-        else:
-            raise TypeError('JumpSet can contain only Jumps')
-
-    @property
-    def types(self):
-        return [j.type for j in self]
-            
-    @property
-    def amplitudes(self):
-        return [j.amp for j in self]
-    
-    @property
-    def bics(self):
-        if with_pandas:
-            return pd.DataFrame([j.bics for j in self], columns=jump_classes)
-        else:
-            return np.array([j.bics for j in self])

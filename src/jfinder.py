@@ -1,6 +1,8 @@
 from __future__ import division
 from .core import *
 from .mugp import MuGP
+from .models import UnclassifiedDiscontinuity as Jump
+from .models import Discontinuity, JumpSet
 
 class JumpFinder(object):
     def __init__(self, kdata, kernel='e', chunk_size=128, **kwargs):
@@ -96,8 +98,8 @@ class JumpFinder(object):
             k = np.argmin(np.abs(cad-jump))
             amplitudes.append(pr[k]-pr[k-1])
 
-        jumps = [Jump(j,a) for j,a in zip(jumps,amplitudes)]
-        jumps = [j for j in jumps if not any([e[0] <= j.pos <= e[1] for e in self.exclude])]
+        jumps = [Jump(j,a) for j,a in zip(jumps, amplitudes)]
+        jumps = [j for j in jumps if not any([e[0] <= j.position <= e[1] for e in self.exclude])]
         return JumpSet(jumps)
 
     

@@ -6,7 +6,7 @@ from .core import *
 from .mugp import MuGP
 from .fmodels import models as fm
 
-from numpy import all
+from numpy import ndarray, array, zeros
 
 ln_two_pi = log(2*pi)
 
@@ -18,28 +18,70 @@ def lnlikelihood(obs, mod, err):
     return -0.5 * (n*ln_two_pi + n*log(err**2) + ((obs-mod)**2).sum()/err**2)
 
 
-class Discontinuity(object):
-    names = []
-    npar  = len(names)
+class JumpSet(list):
+    def __init__(self, values=[]):
+        if isinstance(values, Discontinuity):
+            super(JumpSet, self).__init__([values])
+        elif isinstance(values, list) and all([isinstance(v, Discontinuity) for v in values]):
+            super(JumpSet, self).__init__(values)
+        else:
+            raise TypeError('JumpSet can contain only Jumps')
+        
+    def append(self, v):
+        if isinstance(v, Discontinuity):
+            super(JumpSet, self).append(v)
+        else:
+            raise TypeError('JumpSet can contain only Jumps')
+
+    @property
+    def types(self):
+        return [j.name for j in self]
+            
+    @property
+    def amplitudes(self):
+        return [j.amplitude for j in self]
     
-    def __init__(self, jump, cadence, flux, hp, gp=None, use_gp=True):
-        self.jump = jump
+    @property
+    def bics(self):
+        if with_pandas:
+            return pd.DataFrame([j.bics for j in self], columns=jump_classes)
+        else:
+            return np.array([j.bics for j in self])
+
+
+class DiscontinuityType(object):
+    name   = ''
+    pnames = []
+    npar   = len(pnames)
+    
+    def __init__(self, position, amplitude, cadence=None, flux=None, hp=None, gp=None, use_gp=True):
+        self.position = float(position)
+        self.amplitude = float(amplitude)
         self.cadence = cadence
         self.flux = flux
         self.hp = hp
         self.gp = gp
         self.use_gp = gp is not None and use_gp
 
-        self.npt = self.flux.size
+        self.npt = 0 if flux is None else self.flux.size
         self.best_fit_pv = None
         self.best_fit_model = None
-
+        self.bic = None
+        
         self._optimization_result = None
         
         if self.use_gp:
             self.nlnlike = self.nlnlike_gp
         else:
             self.nlnlike = self.nlnlike_wn
+            
+
+    def __str__(self):
+        return '{:s} {:4.1f}  {:4.1f}'.format(self.name, self.position, self.amplitude)
+
+    
+    def __repr__(self):
+        return '{:s}({:4.1f}, {:4.1f})'.format(self.name, self.position, self.amplitude)
 
             
     def nlnlike_wn(self, pv):
@@ -57,7 +99,7 @@ class Discontinuity(object):
 
         
     def fit(self, use_de=False, de_npop=30, de_niter=100, method='Powell'):
-        jamp, jpos, fstd = self.jump.amp, self.jump.pos, self.flux.std()
+        jamp, jpos, fstd = self.amplitude, self.position, self.flux.std()
         if use_de:
             self._de = DiffEvol(self.nlnlike, self._de_bounds(jamp, jpos, fstd), npop=de_npop)
             self._de.optimize(de_niter)
@@ -78,9 +120,19 @@ class Discontinuity(object):
     
     def c_bic(self, nln):
         return 2*nln + self.npar*log(self.npt)
-    
 
-class Slope(Discontinuity):
+    
+class UnclassifiedDiscontinuity(DiscontinuityType):
+    name   = 'Unclassified'
+    pnames = []
+    npar   = len(pnames)
+
+    
+    def fit(self, *nargs, **kwargs):
+        raise NotImplementedError
+
+    
+class Slope(DiscontinuityType):
     name   = 'slope'
     pnames = 'slope intercept'.split()
     npar   = len(pnames)
@@ -100,7 +152,7 @@ class Slope(Discontinuity):
         return self.bic
 
     
-class Jump(Discontinuity):
+class Jump(DiscontinuityType):
     name   = 'jump'
     pnames = 'center width amplitude bl_constant bl_slope'.split()
     npar   = len(pnames)
@@ -109,7 +161,7 @@ class Jump(Discontinuity):
         return fm.m_jump(*pv, cadence=self.cadence)
 
     def is_inside_bounds(self, pv):
-        return all(pv[:2] > 0) and (0.5 < pv[1] < 3.0) and (self.jump.pos-3 <= pv[0] <= self.jump.pos+3)
+        return all(pv[:2] > 0) and (0.5 < pv[1] < 3.0) and (self.position-3 <= pv[0] <= self.position+3)
     
     def _de_bounds(self, jamp, jpos, fstd):
         return [[     jpos-2,     jpos+2],  # 0 - center
@@ -122,7 +174,7 @@ class Jump(Discontinuity):
         return [jpos, 2, jamp, fstd, 0]
             
 
-class Transit(Discontinuity):
+class Transit(DiscontinuityType):
     name   = 'transit'
     pnames = 'depth center duration bl_constant bl_slope'.split()
     npar   = len(pnames)
@@ -144,7 +196,7 @@ class Transit(Discontinuity):
         return [jamp, jpos, 10, fstd, 0]
             
     
-class Flare(Discontinuity):
+class Flare(DiscontinuityType):
     name   = 'flare'
     pnames = 'start duration amplitude bl_constant bl_slope'
     npar   = len(pnames)
@@ -164,7 +216,36 @@ class Flare(Discontinuity):
                
     def _pv0(self, jamp, jpos, fstd):
         return array([jpos, 2.5, jamp, fstd, 0])
-            
+
+    
+class Discontinuity(object):
+
+    _available_models = Slope, Jump, Transit, Flare
+    
+    def __init__(self, position, amplitude, cadence, flux, hp=None, gp=None, use_gp=True):
+        assert isinstance(cadence, (tuple, list, ndarray)) 
+        assert isinstance(flux, (tuple, list, ndarray))
+        assert len(flux) == len(cadence)
+        
+        self.position = float(position)
+        self.amplitude = float(amplitude)
+        self.cadence = cadence
+        self.flux = flux
+
+        self.type = UnclassifiedDiscontinuity(position, amplitude)
+        self.models = [M(position, amplitude, cadence, flux, hp, gp, use_gp) for M in self._available_models]
+        self.bics = zeros(len(self.models))
+
+        
+    def classify(self, use_de=True, de_npop=30, de_niter=100, method='Nelder-Mead'):    
+        self.bics[:] = array([m.fit(use_de, de_npop, de_niter, method) for m in self.models])
+        self.bics -= self.bics.min()
+        self.type = self.models[self.bics.argmin()]
+
+        
+    @property
+    def name(self):
+        return self.type.name
 
     
 dmodels = Slope, Jump, Transit, Flare

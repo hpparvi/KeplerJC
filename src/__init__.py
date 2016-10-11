@@ -1,6 +1,7 @@
 from .jfinder import JumpFinder
 from .jclassifier import JumpClassifier
-from .core import Jump, JumpSet, KData
+from .core import KData
+from .models import JumpSet, Jump
 
 __all__ = ['correct_jumps', 'KData', 'JumpFinder', 'JumpClassifier', 'Jump', 'JumpSet']
 
