@@ -1,11 +1,12 @@
 from .jfinder import JumpFinder
 from .jclassifier import JumpClassifier
 from .core import KData
-from .models import JumpSet, Jump
+from .discontinuity import Discontinuity, DiscontinuitySet
+from .models import Slope, Jump, Jump2, Transit, Flare
 
-__all__ = ['correct_jumps', 'KData', 'JumpFinder', 'JumpClassifier', 'Jump', 'JumpSet']
+__all__ = 'correct_jumps KData JumpFinder JumpClassifier Discontinuity DiscontinuitySet'.split()
 
-def correct_jumps(data, jumps, jc):
+def correct_jumps(data, jumps):
     """Correct jumps
     
     Parameters
@@ -13,7 +14,7 @@ def correct_jumps(data, jumps, jc):
     data  : KData
             Cadence and flux values
             
-    jumps : list or JumpSet
+    jumps : list or DiscontinuitySet
             A list of jumps found by JumpFinder and classified
             by JumpClassifier
 
@@ -21,8 +22,6 @@ def correct_jumps(data, jumps, jc):
     """
     kd = KData(data._cadence, data._flux, data._quality)
     for j in jumps:
-        if j.type == 'jump':
-            pv = j._pv.copy()
-            pv[-2:] = 0
-            kd._flux[kd._mask] -= j._median * (jc.m_jump(pv, data.cadence))
+        if isinstance(j.type, (Jump,Jump2)):
+            kd._flux[kd._mask] -= kd.median*j.global_model_wo_baseline()
     return kd

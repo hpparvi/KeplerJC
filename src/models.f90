@@ -121,6 +121,34 @@ contains
     end do
     model = baseline + slope*(cadence-cmean) + amplitude * model
   end subroutine m_flare
+
+  
+  subroutine m_jumpf(center, width, famp, jamp, baseline, slope, cadence, npt, model)
+    implicit none
+    integer, intent(in) :: npt
+    real(8), intent(in) :: center, width, famp, jamp, baseline, slope
+    real(8), intent(in), dimension(npt) :: cadence
+    real(8), intent(out), dimension(npt) :: model
+    real(8) :: cmean, a, b
+    integer :: i, cstart
+
+    cmean  = sum(cadence) / real(npt, 8)
+    cstart = floor(center)
     
+    do concurrent(i = 1:npt)
+       if (cadence(i) >= cstart) then
+          if (cadence(i) > cstart) then
+             a = cadence(i) - center
+             b = cadence(i) + 1.0d0 - center
+          else if (cadence(i) == cstart) then
+             a = 0.0d0
+             b = cadence(i) + 1.0d0 - center
+          end if
+          model(i) = (famp-jamp)*(-exp(-b/width) + exp(-a/width)) * width * (b-a) + jamp*(b-a)
+       end if
+    end do
+    model = baseline + slope*(cadence-cmean) + model
+  end subroutine m_jumpf
+
 end module models
 

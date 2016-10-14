@@ -26,8 +26,9 @@ mpi_root = 0
 np.seterr(all='ignore')
 logging.basicConfig(level=logging.INFO)
 
-excluded_cadences = dict(3 = [[10390,10650]],
-                         4 = [[12900,13000], [13400,13500], [14200,14400]])
+excluded_cadences = {3 : [[10390,10650]],
+                     4 : [[12900,13000], [13400,13500], [14200,14400]],
+                     8 : [[31900,32050]]}
 
 def main():
     ap = ArgumentParser()
@@ -166,12 +167,12 @@ def reduce(filename, args):
     linfo(' Starting discontinuity classification')
     linfo(' -------------------------------------')
     jc = JumpClassifier(kdata, jf.hp)
-    jc.classify(jumps, de_niter=args.de_niter, de_npop=args.de_npop)
+    jc.classify(jumps, use_de=True, de_niter=args.de_niter, de_npop=args.de_npop)
 
     linfo('')
     linfo(' Removing jumps')
     linfo(' --------------')
-    cdata = correct_jumps(kdata, jumps, jc)
+    cdata = correct_jumps(kdata, jumps)
 
     if 'JCR_FLUX' in [c.name for c in data.columns]:
         data['JCR_FLUX'][:] = cdata._flux.astype(np.float32)
@@ -179,9 +180,9 @@ def reduce(filename, args):
         hdul[1] = pf.BinTableHDU.from_columns(data.columns + pf.Column(name='JCR_FLUX', format='E', unit='e-/s', disp='E14.7', array=cdata._flux.astype(np.float32)),
                                                header = hdul[1].header)
 
-    hdul[1].header['jlocs']  = str([j.pos for j in jumps])
-    hdul[1].header['jamps']  = str([j.amp for j in jumps])
-    hdul[1].header['jtypes'] = str([j.type for j in jumps])
+    hdul[1].header['jlocs']  = str([j.position for j in jumps])
+    hdul[1].header['jamps']  = str([j.amplitude for j in jumps])
+    hdul[1].header['jtypes'] = str([j.name for j in jumps])
 
     if args.inplace:
         hdul.flush()

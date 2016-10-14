@@ -1,8 +1,8 @@
 from __future__ import division
+from tqdm import tqdm
 from .core import *
 from .mugp import MuGP
-from .models import UnclassifiedDiscontinuity as Jump
-from .models import Discontinuity, JumpSet
+from .discontinuity import Discontinuity, DiscontinuitySet
 
 class JumpFinder(object):
     def __init__(self, kdata, kernel='e', chunk_size=128, **kwargs):
@@ -55,8 +55,9 @@ class JumpFinder(object):
 
     
     def learn_hp(self, max_chunks=50):
-        self.hps = [fmin(self.minfun, self.gp.pv0, args=(sl,), disp=False)
-                        for sl in self.chunks[:max_chunks]]
+        self.hps = []
+        for sl in tqdm(self.chunks[:max_chunks], desc='Learning noise hyperparameters'):
+            self.hps.append(fmin(self.minfun, self.gp.pv0, args=(sl,), disp=False))
         self.hp = median(self.hps, 0)
 
         
@@ -64,7 +65,7 @@ class JumpFinder(object):
         self.lnlike = lnlike = zeros_like(self.flux)
         self.gp.set_parameters(self.hp)
         
-        for sl in self.chunks:
+        for sl in tqdm(self.chunks, desc='Finding discontinuities'):
             breaks = [None]+list(self.cadence[sl])
             lnl = array([self.gp.lnlikelihood(self.cadence[sl], self.flux[sl], br) for br in breaks])
             lnl[1] = lnl[2]
@@ -98,9 +99,9 @@ class JumpFinder(object):
             k = np.argmin(np.abs(cad-jump))
             amplitudes.append(pr[k]-pr[k-1])
 
-        jumps = [Jump(j,a) for j,a in zip(jumps, amplitudes)]
+        jumps = [Discontinuity(j,a, self.cadence, 1.+self.flux) for j,a in zip(jumps, amplitudes)]
         jumps = [j for j in jumps if not any([e[0] <= j.position <= e[1] for e in self.exclude])]
-        return JumpSet(jumps)
+        return DiscontinuitySet(jumps)
 
     
     def plot(self, chunk=0, ax=None):
