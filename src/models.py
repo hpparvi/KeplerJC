@@ -180,7 +180,7 @@ class Transit(DiscontinuityType):
     
 class Flare(DiscontinuityType):
     name   = 'flare'
-    pnames = 'start duration amplitude bl_constant bl_slope'
+    pnames = 'start duration amplitude bl_constant bl_slope'.split()
     npar   = len(pnames)
 
     def model(self, pv, cad=None):
