@@ -8,7 +8,8 @@ from .models import *
 class Discontinuity(object):
 
     _available_models = Slope, Jump, Jump2, Transit, Flare
-    
+    #_available_models = Slope, Jump, Transit, Flare
+
     def __init__(self, position, amplitude, cadence, flux, window_width=100):
         """
         Parameters

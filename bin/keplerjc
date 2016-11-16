@@ -26,7 +26,7 @@ mpi_root = 0
 np.seterr(all='ignore')
 logging.basicConfig(level=logging.INFO)
 
-excluded_cadences = {3 : [[10390,10650]],
+excluded_cadences = {3 : [[ 8390, 8440], [ 8880, 8940], [10390,10650]],
                      4 : [[12900,13000], [13400,13500], [14200,14400]],
                      5 : [[17914,17981], [19320,19365]],
                      6 : [[22390,22440], [23945,23995]],

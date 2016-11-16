@@ -15,9 +15,10 @@ def lnlikelihood(obs, mod, err):
 
 
 class DiscontinuityType(object):
-    name   = ''
-    pnames = []
-    npar   = len(pnames)
+    name    = ''
+    pnames  = []
+    npar    = len(pnames)
+    penalty = 0.
     
     def __init__(self, discontinuity):
         self.discontinuity = self.d = discontinuity
@@ -72,7 +73,7 @@ class DiscontinuityType(object):
 
     
     def c_bic(self, nln):
-        return 2*nln + self.npar*log(self.d.npt)
+        return 2*nln + self.npar*log(self.d.npt) + self.penalty
 
     
 class UnclassifiedDiscontinuity(DiscontinuityType):
@@ -129,10 +130,10 @@ class Jump(DiscontinuityType):
 
     
 class Jump2(DiscontinuityType):
-    name   = 'jumpf'
-    pnames = 'center width famp jamp bl_constant bl_slope'.split()
-    npar   = len(pnames)
-
+    name    = 'jumpf'
+    pnames  = 'center width famp jamp bl_constant bl_slope'.split()
+    npar    = len(pnames)
+    
     def model(self, pv, cad=None):
         return fm.m_jumpf(*pv, cadence=self.d.cadence if cad is None else cad)
 
@@ -140,7 +141,8 @@ class Jump2(DiscontinuityType):
         return ((self.d.position-3 <= pv[0] <= self.d.position+3)
                 and (2.5 < pv[1] < 20.)
                 and (pv[2] < 0.)
-                and (pv[3] < 0.))
+                and (pv[3] < 0.)
+                and (pv[2] < pv[3]))
     
     def _de_bounds(self, jamp, jpos, fstd):
         return [[     jpos-4,     jpos+4],  # 0 - center
