@@ -46,6 +46,7 @@ def main():
     ap.add_argument('--modules', type=str, default=None)
     ap.add_argument('--outputs', type=str, default=None)
     ap.add_argument('--modouts', type=str, default=None)
+    ap.add_argument('--jsigma', type=float, default=20)
     args = ap.parse_args()
 
     ## Logging
@@ -163,7 +164,7 @@ def reduce(filename, args):
     linfo(' Starting discontinuity search')
     linfo(' -----------------------------')
     jf = JumpFinder(kdata, exclude=excluded)
-    jumps = jf.find_jumps()
+    jumps = jf.find_jumps(jump_sigma=args.jsigma)
     linfo('    Found %i discontinuities', len(jumps))
 
     linfo('')

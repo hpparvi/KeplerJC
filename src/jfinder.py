@@ -73,7 +73,7 @@ class JumpFinder(object):
         return lnlike
 
     
-    def find_jumps(self, sigma=10, learn=True, cln=True):
+    def find_jumps(self, jump_sigma=15, learn=True, cln=True):
         if learn:
             self.learn_hp(max_chunks=15)
         if cln:
@@ -81,7 +81,7 @@ class JumpFinder(object):
         
         mlnlike = self.lnlike - mf(self.lnlike, 90)
         sigma  = 1.4826 * median(abs(mlnlike-median(mlnlike)))
-        lnmask = mlnlike > 15*sigma
+        lnmask = mlnlike > jump_sigma*sigma
         labels, nl = label(ndi.binary_dilation(lnmask, iterations=5))
         jumps = [self.cadence[argmax(where(labels==i, self.lnlike, 0))] for i in range(1,nl+1)]
         jumps = [j for j in jumps if j>0]
