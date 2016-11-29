@@ -170,7 +170,7 @@ class Transit(DiscontinuityType):
                 and (1. < pv[2] < 50.))
 
     def _de_bounds(self, jamp, jpos, fstd):
-        return [[ -0.8*jamp, -1.2*jamp],  # 0 - transit depth
+        return [[ -abs(jamp), abs(jamp)], # 0 - transit depth
                 [    jpos-5,   jpos+5],  # 1 - center 
                 [       1.2,      50.],  # 2 - duration
                 [ -0.2*fstd, 0.2*fstd],  # 3 - baseline constant
